@@ -1,0 +1,758 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Knowledge Capture Pipeline API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: patients
+    description: Patient operations
+  - name: doctors
+    description: Doctor operations
+  - name: knowledge
+    description: Knowledge node operations
+  - name: capture
+    description: Capture candidate operations
+  - name: events
+    description: Event log operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /healthz/openai:
+    get:
+      operationId: checkOpenAIHealth
+      tags: [health]
+      summary: Check if OpenAI API key is configured and usable
+      responses:
+        "200":
+          description: OpenAI status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenAIHealth"
+
+  /patients:
+    get:
+      operationId: listPatients
+      tags: [patients]
+      summary: List all patients
+      responses:
+        "200":
+          description: List of patients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patient"
+    post:
+      operationId: createPatient
+      tags: [patients]
+      summary: Create a new patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientInput"
+      responses:
+        "201":
+          description: Created patient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+
+  /patients/{patientId}/context:
+    get:
+      operationId: getPatientContext
+      tags: [patients]
+      summary: Get patient context nodes
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Patient context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientContext"
+
+  /doctors:
+    get:
+      operationId: listDoctors
+      tags: [doctors]
+      summary: List all doctors
+      responses:
+        "200":
+          description: List of doctors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Doctor"
+    post:
+      operationId: createDoctor
+      tags: [doctors]
+      summary: Create a new doctor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DoctorInput"
+      responses:
+        "201":
+          description: Created doctor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Doctor"
+
+  /doctors/{doctorId}/context:
+    get:
+      operationId: getDoctorContext
+      tags: [doctors]
+      summary: Get doctor context — their nodes and stats
+      parameters:
+        - name: doctorId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Doctor context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoctorContext"
+        "404":
+          description: Doctor not found
+
+  /extract:
+    post:
+      operationId: extractKnowledge
+      tags: [capture]
+      summary: Extract knowledge nodes from transcript using LLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractInput"
+      responses:
+        "200":
+          description: Extracted candidates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CaptureCandidate"
+
+  /detect-conflicts:
+    post:
+      operationId: detectConflicts
+      tags: [capture]
+      summary: Generate embedding and detect conflicts via cosine similarity search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConflictDetectInput"
+      responses:
+        "200":
+          description: Conflict detection result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictResult"
+
+  /confirm-node:
+    post:
+      operationId: confirmNode
+      tags: [capture]
+      summary: Confirm and create a knowledge node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmNodeInput"
+      responses:
+        "201":
+          description: Created knowledge node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeNode"
+
+  /dismiss-node:
+    post:
+      operationId: dismissNode
+      tags: [capture]
+      summary: Dismiss a capture candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DismissNodeInput"
+      responses:
+        "200":
+          description: Dismissed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResult"
+
+  /merge-node:
+    post:
+      operationId: mergeNode
+      tags: [capture]
+      summary: Merge candidate with existing knowledge node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeNodeInput"
+      responses:
+        "200":
+          description: Merged knowledge node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeNode"
+
+  /undo-node:
+    post:
+      operationId: undoNode
+      tags: [capture]
+      summary: Undo an auto-captured node within the 60-second window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UndoNodeInput"
+      responses:
+        "200":
+          description: Undone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionResult"
+
+  /knowledge-nodes:
+    get:
+      operationId: listKnowledgeNodes
+      tags: [knowledge]
+      summary: List knowledge nodes with optional filters
+      parameters:
+        - name: patientId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: doctorId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: department
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: type
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of knowledge nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeNode"
+
+  /knowledge-nodes/search:
+    post:
+      operationId: semanticSearchNodes
+      tags: [knowledge]
+      summary: Semantic similarity search over knowledge nodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SemanticSearchBody"
+      responses:
+        "200":
+          description: Ranked search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SemanticSearchResult"
+
+  /knowledge-nodes/{nodeId}:
+    get:
+      operationId: getKnowledgeNode
+      tags: [knowledge]
+      summary: Get a single knowledge node
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Knowledge node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeNode"
+    patch:
+      operationId: updateKnowledgeNode
+      tags: [knowledge]
+      summary: Update a knowledge node
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeNodeUpdate"
+      responses:
+        "200":
+          description: Updated node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeNode"
+
+  /capture-summary:
+    get:
+      operationId: getCaptureSummary
+      tags: [capture]
+      summary: Get dashboard summary of capture pipeline stats
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaptureSummary"
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List recent event log entries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Event log
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventLog"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    Patient:
+      type: object
+      required: [id, name, mrn]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        mrn:
+          type: string
+        dateOfBirth:
+          type: ["string", "null"]
+        department:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PatientInput:
+      type: object
+      required: [name, mrn]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        mrn:
+          type: string
+          minLength: 1
+        dateOfBirth:
+          type: ["string", "null"]
+        department:
+          type: ["string", "null"]
+
+    Doctor:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        specialty:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    DoctorInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        specialty:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+
+    PatientContext:
+      type: object
+      required: [patient, knowledgeNodes]
+      properties:
+        patient:
+          $ref: "#/components/schemas/Patient"
+        knowledgeNodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/KnowledgeNode"
+
+    KnowledgeNode:
+      type: object
+      required: [id, type, title, content, importance, confidence, status, level, department]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [CONSTRAINT, DECISION, ANTI_PATTERN, FACT]
+        title:
+          type: string
+        content:
+          type: string
+        importance:
+          type: number
+        confidence:
+          type: number
+        status:
+          type: string
+          enum: [PENDING_CONFIRMATION, ACTIVE, DISMISSED, MERGED]
+        level:
+          type: string
+          enum: [patient, department, organization]
+        department:
+          type: ["string", "null"]
+        rationale:
+          type: ["string", "null"]
+        patientId:
+          type: ["integer", "null"]
+        doctorId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    KnowledgeNodeUpdate:
+      type: object
+      properties:
+        type:
+          type: ["string", "null"]
+          enum: [CONSTRAINT, DECISION, ANTI_PATTERN, FACT, null]
+        title:
+          type: ["string", "null"]
+        content:
+          type: ["string", "null"]
+        importance:
+          type: ["number", "null"]
+        rationale:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+          enum: [ACTIVE, PENDING_CONFIRMATION, DISMISSED, null]
+
+    CaptureCandidate:
+      type: object
+      required: [id, type, title, content, importance, confidence, confidenceTier, suggestedLevel, department, rationale, patientId, doctorId]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [CONSTRAINT, DECISION, ANTI_PATTERN, FACT]
+        title:
+          type: string
+        content:
+          type: string
+        importance:
+          type: number
+        confidence:
+          type: number
+        confidenceTier:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        suggestedLevel:
+          type: string
+          enum: [patient, department, organization]
+        department:
+          type: string
+        rationale:
+          type: string
+        patientId:
+          type: integer
+        doctorId:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, DISMISSED, MERGED]
+        createdAt:
+          type: string
+
+    ExtractInput:
+      type: object
+      required: [transcript, patientId, doctorId]
+      properties:
+        transcript:
+          type: string
+        patientId:
+          type: integer
+        doctorId:
+          type: integer
+
+    ConflictDetectInput:
+      type: object
+      required: [candidateId]
+      properties:
+        candidateId:
+          type: integer
+
+    ConflictResult:
+      type: object
+      required: [candidateId, conflictType, similarity]
+      properties:
+        candidateId:
+          type: integer
+        conflictType:
+          type: string
+          enum: [NEW, COEXIST, UPDATE, DUPLICATE]
+        similarity:
+          type: number
+        existingNode:
+          type: ["object", "null"]
+
+    ConfirmNodeInput:
+      type: object
+      required: [candidateId]
+      properties:
+        candidateId:
+          type: integer
+        editedType:
+          type: ["string", "null"]
+          enum: [CONSTRAINT, DECISION, ANTI_PATTERN, FACT, null]
+        editedTitle:
+          type: ["string", "null"]
+        editedContent:
+          type: ["string", "null"]
+        editedRationale:
+          type: ["string", "null"]
+
+    DismissNodeInput:
+      type: object
+      required: [candidateId]
+      properties:
+        candidateId:
+          type: integer
+
+    MergeNodeInput:
+      type: object
+      required: [candidateId, existingNodeId]
+      properties:
+        candidateId:
+          type: integer
+        existingNodeId:
+          type: integer
+        mergedContent:
+          type: ["string", "null"]
+
+    UndoNodeInput:
+      type: object
+      required: [nodeId]
+      properties:
+        nodeId:
+          type: integer
+
+    CaptureSummary:
+      type: object
+      required: [totalNodes, activeNodes, pendingNodes, todayCaptures, byType, byDepartment, byConfidenceTier, recentActivity]
+      properties:
+        totalNodes:
+          type: integer
+        activeNodes:
+          type: integer
+        pendingNodes:
+          type: integer
+        todayCaptures:
+          type: integer
+        byType:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountByLabel"
+        byDepartment:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountByLabel"
+        byConfidenceTier:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountByLabel"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventLog"
+
+    SemanticSearchBody:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+        topK:
+          type: integer
+          default: 10
+
+    SemanticSearchResult:
+      type: object
+      required: [node, similarity]
+      properties:
+        node:
+          $ref: "#/components/schemas/KnowledgeNode"
+        similarity:
+          type: number
+
+    OpenAIHealth:
+      type: object
+      required: [configured, status]
+      properties:
+        configured:
+          type: boolean
+        status:
+          type: string
+
+    CountByLabel:
+      type: object
+      required: [label, count]
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+
+    EventLog:
+      type: object
+      required: [id, eventType, createdAt]
+      properties:
+        id:
+          type: integer
+        eventType:
+          type: string
+        candidateId:
+          type: ["integer", "null"]
+        nodeId:
+          type: ["integer", "null"]
+        doctorId:
+          type: ["integer", "null"]
+        patientId:
+          type: ["integer", "null"]
+        metadata:
+          type: ["object", "null"]
+        createdAt:
+          type: string
+
+    DoctorContext:
+      type: object
+      required: [doctor, knowledgeNodes]
+      properties:
+        doctor:
+          $ref: "#/components/schemas/Doctor"
+        knowledgeNodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/KnowledgeNode"
+
+    ActionResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    TranscriptionResult:
+      type: object
+      required: [transcript]
+      properties:
+        transcript:
+          type: string

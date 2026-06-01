@@ -1,0 +1,1 @@
+- [MedCapture architecture](medcapture-arch.md) — embeddings as JSON text col, lazy OpenAI init, confidence tiers, conflict similarity thresholds
