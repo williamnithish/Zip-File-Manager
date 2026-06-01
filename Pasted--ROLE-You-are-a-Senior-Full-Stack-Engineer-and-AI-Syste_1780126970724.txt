@@ -1,0 +1,482 @@
+# ROLE
+
+You are a Senior Full Stack Engineer and AI Systems Architect.
+
+Build a complete production-quality solution for the following assessment.
+
+The goal is to create a working Knowledge Capture Pipeline that converts doctor voice transcripts into validated knowledge graph nodes with conflict detection.
+
+Do NOT provide explanations only.
+
+Generate actual code, folder structure, implementation files, database schema, API endpoints, frontend components, prompts, and setup instructions.
+
+---
+
+# ASSESSMENT SUMMARY
+
+Build a system:
+
+Doctor Voice/Text
+→ Transcript Review
+→ LLM Knowledge Extraction
+→ Confidence Routing
+→ Embedding Generation
+→ pgvector Similarity Search
+→ Conflict Resolution
+→ Knowledge Node Creation
+→ Event Logging
+
+Tech Stack:
+
+Frontend:
+
+* Next.js 15
+* TypeScript
+* Tailwind CSS
+
+Backend:
+
+* FastAPI
+* Python 3.11
+
+Database:
+
+* Supabase PostgreSQL
+* pgvector
+
+AI:
+
+* GPT-4o-mini or Gemini Flash
+* text-embedding-3-small
+
+---
+
+# REQUIREMENTS
+
+## Human In Loop #1
+
+Doctor must review transcript before extraction.
+
+Flow:
+
+Paste transcript
+
+Show editable textbox
+
+Doctor edits transcript
+
+Click:
+
+Confirm & Extract
+
+Extraction must never run before confirmation.
+
+---
+
+## LLM Knowledge Extraction
+
+Given:
+
+Transcript
+
+Patient context nodes
+
+Extract:
+
+CONSTRAINT
+DECISION
+ANTI_PATTERN
+FACT
+
+Return:
+
+[
+{
+"type":"",
+"title":"",
+"content":"",
+"importance":0.9,
+"confidence":0.8,
+"suggested_level":"patient",
+"department":"ortho",
+"rationale":""
+}
+]
+
+Use structured JSON output.
+
+---
+
+## Confidence Routing
+
+Implement:
+
+HIGH
+confidence > 0.85
+
+MEDIUM
+0.60 - 0.85
+
+LOW
+< 0.60
+
+Return routing tier.
+
+---
+
+## Human In Loop #2
+
+HIGH
+
+Auto Capture
+
+Green Card
+
+60 second undo timer
+
+Button:
+
+Undo
+
+Status:
+
+PENDING_CONFIRMATION
+
+After 60 seconds:
+
+ACTIVE
+
+---
+
+MEDIUM
+
+Yellow Card
+
+Buttons:
+
+Confirm
+
+Edit
+
+Dismiss
+
+---
+
+LOW
+
+Red Card
+
+Editable form
+
+Doctor must manually edit content
+
+Dropdown:
+
+CONSTRAINT
+
+DECISION
+
+ANTI_PATTERN
+
+FACT
+
+Buttons:
+
+Save
+
+Dismiss
+
+---
+
+All three tiers must have different UI designs.
+
+---
+
+## Conflict Detection
+
+Generate embedding for candidate.
+
+Search pgvector.
+
+SQL:
+
+SELECT
+id,
+title,
+content,
+1 - (embedding <=> candidate_embedding) similarity
+FROM knowledge_nodes
+ORDER BY embedding <=> candidate_embedding
+LIMIT 5
+
+Classification:
+
+> 0.95
+> DUPLICATE
+
+0.85 - 0.95
+UPDATE
+
+0.70 - 0.85
+COEXIST
+
+< 0.70
+NEW
+
+Return:
+
+{
+"similarity":0.94,
+"conflict_type":"DUPLICATE",
+"existing_node":{}
+}
+
+---
+
+## Conflict Resolution UI
+
+Show:
+
+Similarity score
+
+Existing node
+
+Candidate node
+
+Buttons:
+
+Merge
+
+Update
+
+Keep Both
+
+Dismiss
+
+---
+
+## Node Creation
+
+Insert into:
+
+knowledge_nodes
+
+Insert event into:
+
+event_log
+
+---
+
+## Event Logging
+
+Every action must be logged.
+
+Examples:
+
+CAPTURE_DETECTED
+
+CAPTURE_CONFIRMED
+
+CAPTURE_DISMISSED
+
+CAPTURE_MERGED
+
+CAPTURE_UPDATED
+
+CAPTURE_UNDONE
+
+---
+
+## Database
+
+Use Supabase.
+
+Include:
+
+organizations
+
+users
+
+patients
+
+knowledge_nodes
+
+capture_candidates
+
+event_log
+
+Generate SQL migration files.
+
+---
+
+## Embeddings
+
+Use:
+
+text-embedding-3-small
+
+Create:
+
+scripts/generate_embeddings.py
+
+Generate embeddings for seed data.
+
+---
+
+## API ENDPOINTS
+
+POST /extract
+
+POST /detect-conflicts
+
+POST /confirm-node
+
+POST /dismiss-node
+
+POST /merge-node
+
+GET /patient-context/{patient_id}
+
+GET /capture-summary
+
+Generate full FastAPI implementation.
+
+---
+
+## FRONTEND COMPONENTS
+
+Create:
+
+TranscriptInput.tsx
+
+TranscriptReview.tsx
+
+ExtractionResults.tsx
+
+AutoCaptureCard.tsx
+
+ReviewCard.tsx
+
+ExplicitInputCard.tsx
+
+ConflictPanel.tsx
+
+CaptureSummary.tsx
+
+PatientSelector.tsx
+
+DoctorSelector.tsx
+
+Generate full TypeScript code.
+
+---
+
+## FOLDER STRUCTURE
+
+Generate complete folder structure.
+
+Example:
+
+backend/
+frontend/
+scripts/
+docs/
+supabase/
+
+---
+
+## ARCHITECTURE DOCUMENT
+
+Create:
+
+docs/architecture.md
+
+Explain:
+
+Extraction pipeline
+
+Confidence routing
+
+Conflict thresholds
+
+Undo mechanism
+
+Human review workflow
+
+Scalability to 10,000+ nodes
+
+pgvector indexing strategy
+
+---
+
+## README
+
+Generate complete README.
+
+Include:
+
+Setup
+
+Environment Variables
+
+Running Backend
+
+Running Frontend
+
+Loading Seed Data
+
+Generating Embeddings
+
+Testing Scenarios
+
+Demo Steps
+
+---
+
+## DATA SOURCES
+
+Generate:
+
+data_sources.md
+
+Document all clinical information sources used.
+
+---
+
+## TEST SCENARIOS
+
+Implement support for:
+
+Ramaiah transcript
+
+Aadhya transcript
+
+No-change transcript
+
+Show expected outputs.
+
+---
+
+# OUTPUT FORMAT
+
+Generate project one section at a time.
+
+Start with:
+
+1. Folder Structure
+2. Backend Implementation
+3. Database Schema
+4. Embedding Script
+5. Frontend Components
+6. API Integration
+7. Architecture.md
+8. README.md
+9. data_sources.md
+
+Provide complete code.
+
+Do not skip files.
+
+Do not use placeholders.
+
+Generate production-ready code.

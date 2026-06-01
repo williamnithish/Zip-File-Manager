@@ -5,435 +5,1552 @@
  * Knowledge Capture Pipeline API
  * OpenAPI spec version: 0.1.0
  */
-import * as zod from 'zod';
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
+import type {
+  MutationFunction,
+  QueryFunction,
+  QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult
+} from '@tanstack/react-query';
+
+import type {
+  ActionResult,
+  CaptureCandidate,
+  CaptureSummary,
+  ConfirmNodeInput,
+  ConflictDetectInput,
+  ConflictResult,
+  DismissNodeInput,
+  Doctor,
+  DoctorContext,
+  DoctorInput,
+  EventLog,
+  ExtractInput,
+  HealthStatus,
+  KnowledgeNode,
+  KnowledgeNodeUpdate,
+  ListEventsParams,
+  ListKnowledgeNodesParams,
+  MergeNodeInput,
+  OpenAIHealth,
+  Patient,
+  PatientContext,
+  PatientInput,
+  SemanticSearchBody,
+  SemanticSearchResult,
+  UndoNodeInput
+} from './api.schemas';
+
+import { customFetch } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
+
+type AwaitedInput<T> = PromiseLike<T> | T;
+
+      type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
+
+
+type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getHealthCheckUrl = () => {
+
+
+
+
+  return `/api/healthz`
+}
+
+/**
+ * @summary Health check
+ */
+export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
+
+  return customFetch<HealthStatus>(getHealthCheckUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getHealthCheckQueryKey = () => {
+    return [
+    `/api/healthz`
+    ] as const;
+    }
+
+
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
+export type HealthCheckQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Health check
  */
-export const HealthCheckResponse = zod.object({
-  "status": zod.string()
-})
+
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCheckOpenAIHealthUrl = () => {
+
+
+
+
+  return `/api/healthz/openai`
+}
+
+/**
+ * @summary Check if OpenAI API key is configured and usable
+ */
+export const checkOpenAIHealth = async ( options?: RequestInit): Promise<OpenAIHealth> => {
+
+  return customFetch<OpenAIHealth>(getCheckOpenAIHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckOpenAIHealthQueryKey = () => {
+    return [
+    `/api/healthz/openai`
+    ] as const;
+    }
+
+
+export const getCheckOpenAIHealthQueryOptions = <TData = Awaited<ReturnType<typeof checkOpenAIHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkOpenAIHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckOpenAIHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkOpenAIHealth>>> = ({ signal }) => checkOpenAIHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkOpenAIHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckOpenAIHealthQueryResult = NonNullable<Awaited<ReturnType<typeof checkOpenAIHealth>>>
+export type CheckOpenAIHealthQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Check if OpenAI API key is configured and usable
  */
-export const CheckOpenAIHealthResponse = zod.object({
-  "configured": zod.boolean(),
-  "status": zod.string()
-})
+
+export function useCheckOpenAIHealth<TData = Awaited<ReturnType<typeof checkOpenAIHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkOpenAIHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckOpenAIHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListPatientsUrl = () => {
+
+
+
+
+  return `/api/patients`
+}
+
+/**
+ * @summary List all patients
+ */
+export const listPatients = async ( options?: RequestInit): Promise<Patient[]> => {
+
+  return customFetch<Patient[]>(getListPatientsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPatientsQueryKey = () => {
+    return [
+    `/api/patients`
+    ] as const;
+    }
+
+
+export const getListPatientsQueryOptions = <TData = Awaited<ReturnType<typeof listPatients>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPatients>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPatientsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPatients>>> = ({ signal }) => listPatients({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPatients>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPatientsQueryResult = NonNullable<Awaited<ReturnType<typeof listPatients>>>
+export type ListPatientsQueryError = ErrorType<unknown>
 
 
 /**
  * @summary List all patients
  */
-export const ListPatientsResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "mrn": zod.string(),
-  "dateOfBirth": zod.string().nullish(),
-  "department": zod.string().nullish(),
-  "createdAt": zod.string().optional()
-})
-export const ListPatientsResponse = zod.array(ListPatientsResponseItem)
 
+export function useListPatients<TData = Awaited<ReturnType<typeof listPatients>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPatients>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPatientsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePatientUrl = () => {
+
+
+
+
+  return `/api/patients`
+}
 
 /**
  * @summary Create a new patient
  */
+export const createPatient = async (patientInput: PatientInput, options?: RequestInit): Promise<Patient> => {
+
+  return customFetch<Patient>(getCreatePatientUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      patientInput,)
+  }
+);}
 
 
 
 
-export const CreatePatientBody = zod.object({
-  "name": zod.string().min(1),
-  "mrn": zod.string().min(1),
-  "dateOfBirth": zod.string().nullish(),
-  "department": zod.string().nullish()
-})
+export const getCreatePatientMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPatient>>, TError,{data: BodyType<PatientInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPatient>>, TError,{data: BodyType<PatientInput>}, TContext> => {
+
+const mutationKey = ['createPatient'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPatient>>, {data: BodyType<PatientInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPatient(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePatientMutationResult = NonNullable<Awaited<ReturnType<typeof createPatient>>>
+    export type CreatePatientMutationBody = BodyType<PatientInput>
+    export type CreatePatientMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new patient
+ */
+export const useCreatePatient = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPatient>>, TError,{data: BodyType<PatientInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPatient>>,
+        TError,
+        {data: BodyType<PatientInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePatientMutationOptions(options));
+    }
+
+export const getGetPatientContextUrl = (patientId: number,) => {
+
+
+
+
+  return `/api/patients/${patientId}/context`
+}
+
+/**
+ * @summary Get patient context nodes
+ */
+export const getPatientContext = async (patientId: number, options?: RequestInit): Promise<PatientContext> => {
+
+  return customFetch<PatientContext>(getGetPatientContextUrl(patientId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPatientContextQueryKey = (patientId: number,) => {
+    return [
+    `/api/patients/${patientId}/context`
+    ] as const;
+    }
+
+
+export const getGetPatientContextQueryOptions = <TData = Awaited<ReturnType<typeof getPatientContext>>, TError = ErrorType<unknown>>(patientId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientContext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPatientContextQueryKey(patientId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatientContext>>> = ({ signal }) => getPatientContext(patientId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(patientId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatientContext>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatientContextQueryResult = NonNullable<Awaited<ReturnType<typeof getPatientContext>>>
+export type GetPatientContextQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Get patient context nodes
  */
-export const GetPatientContextParams = zod.object({
-  "patientId": zod.coerce.number()
-})
 
-export const GetPatientContextResponse = zod.object({
-  "patient": zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "mrn": zod.string(),
-  "dateOfBirth": zod.string().nullish(),
-  "department": zod.string().nullish(),
-  "createdAt": zod.string().optional()
-}),
-  "knowledgeNodes": zod.array(zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-}))
-})
+export function useGetPatientContext<TData = Awaited<ReturnType<typeof getPatientContext>>, TError = ErrorType<unknown>>(
+ patientId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientContext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatientContextQueryOptions(patientId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListDoctorsUrl = () => {
+
+
+
+
+  return `/api/doctors`
+}
+
+/**
+ * @summary List all doctors
+ */
+export const listDoctors = async ( options?: RequestInit): Promise<Doctor[]> => {
+
+  return customFetch<Doctor[]>(getListDoctorsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDoctorsQueryKey = () => {
+    return [
+    `/api/doctors`
+    ] as const;
+    }
+
+
+export const getListDoctorsQueryOptions = <TData = Awaited<ReturnType<typeof listDoctors>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDoctors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDoctorsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDoctors>>> = ({ signal }) => listDoctors({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDoctors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDoctorsQueryResult = NonNullable<Awaited<ReturnType<typeof listDoctors>>>
+export type ListDoctorsQueryError = ErrorType<unknown>
 
 
 /**
  * @summary List all doctors
  */
-export const ListDoctorsResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "specialty": zod.string().nullish(),
-  "email": zod.string().nullish(),
-  "createdAt": zod.string().optional()
-})
-export const ListDoctorsResponse = zod.array(ListDoctorsResponseItem)
 
+export function useListDoctors<TData = Awaited<ReturnType<typeof listDoctors>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDoctors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDoctorsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDoctorUrl = () => {
+
+
+
+
+  return `/api/doctors`
+}
 
 /**
  * @summary Create a new doctor
  */
+export const createDoctor = async (doctorInput: DoctorInput, options?: RequestInit): Promise<Doctor> => {
+
+  return customFetch<Doctor>(getCreateDoctorUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      doctorInput,)
+  }
+);}
 
 
 
-export const CreateDoctorBody = zod.object({
-  "name": zod.string().min(1),
-  "specialty": zod.string().nullish(),
-  "email": zod.string().nullish()
-})
+
+export const getCreateDoctorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDoctor>>, TError,{data: BodyType<DoctorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDoctor>>, TError,{data: BodyType<DoctorInput>}, TContext> => {
+
+const mutationKey = ['createDoctor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDoctor>>, {data: BodyType<DoctorInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDoctor(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDoctorMutationResult = NonNullable<Awaited<ReturnType<typeof createDoctor>>>
+    export type CreateDoctorMutationBody = BodyType<DoctorInput>
+    export type CreateDoctorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new doctor
+ */
+export const useCreateDoctor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDoctor>>, TError,{data: BodyType<DoctorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDoctor>>,
+        TError,
+        {data: BodyType<DoctorInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDoctorMutationOptions(options));
+    }
+
+export const getGetDoctorContextUrl = (doctorId: number,) => {
+
+
+
+
+  return `/api/doctors/${doctorId}/context`
+}
+
+/**
+ * @summary Get doctor context — their nodes and stats
+ */
+export const getDoctorContext = async (doctorId: number, options?: RequestInit): Promise<DoctorContext> => {
+
+  return customFetch<DoctorContext>(getGetDoctorContextUrl(doctorId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDoctorContextQueryKey = (doctorId: number,) => {
+    return [
+    `/api/doctors/${doctorId}/context`
+    ] as const;
+    }
+
+
+export const getGetDoctorContextQueryOptions = <TData = Awaited<ReturnType<typeof getDoctorContext>>, TError = ErrorType<void>>(doctorId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDoctorContext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDoctorContextQueryKey(doctorId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDoctorContext>>> = ({ signal }) => getDoctorContext(doctorId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(doctorId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDoctorContext>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDoctorContextQueryResult = NonNullable<Awaited<ReturnType<typeof getDoctorContext>>>
+export type GetDoctorContextQueryError = ErrorType<void>
 
 
 /**
  * @summary Get doctor context — their nodes and stats
  */
-export const GetDoctorContextParams = zod.object({
-  "doctorId": zod.coerce.number()
-})
 
-export const GetDoctorContextResponse = zod.object({
-  "doctor": zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "specialty": zod.string().nullish(),
-  "email": zod.string().nullish(),
-  "createdAt": zod.string().optional()
-}),
-  "knowledgeNodes": zod.array(zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-}))
-})
+export function useGetDoctorContext<TData = Awaited<ReturnType<typeof getDoctorContext>>, TError = ErrorType<void>>(
+ doctorId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDoctorContext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDoctorContextQueryOptions(doctorId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExtractKnowledgeUrl = () => {
+
+
+
+
+  return `/api/extract`
+}
 
 /**
  * @summary Extract knowledge nodes from transcript using LLM
  */
-export const ExtractKnowledgeBody = zod.object({
-  "transcript": zod.string(),
-  "patientId": zod.number(),
-  "doctorId": zod.number()
-})
+export const extractKnowledge = async (extractInput: ExtractInput, options?: RequestInit): Promise<CaptureCandidate[]> => {
 
-export const ExtractKnowledgeResponseItem = zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "confidenceTier": zod.enum(['HIGH', 'MEDIUM', 'LOW']),
-  "suggestedLevel": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string(),
-  "rationale": zod.string(),
-  "patientId": zod.number(),
-  "doctorId": zod.number(),
-  "status": zod.enum(['PENDING', 'CONFIRMED', 'DISMISSED', 'MERGED']).optional(),
-  "createdAt": zod.string().optional()
-})
-export const ExtractKnowledgeResponse = zod.array(ExtractKnowledgeResponseItem)
+  return customFetch<CaptureCandidate[]>(getExtractKnowledgeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      extractInput,)
+  }
+);}
 
+
+
+
+export const getExtractKnowledgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractKnowledge>>, TError,{data: BodyType<ExtractInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof extractKnowledge>>, TError,{data: BodyType<ExtractInput>}, TContext> => {
+
+const mutationKey = ['extractKnowledge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof extractKnowledge>>, {data: BodyType<ExtractInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  extractKnowledge(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExtractKnowledgeMutationResult = NonNullable<Awaited<ReturnType<typeof extractKnowledge>>>
+    export type ExtractKnowledgeMutationBody = BodyType<ExtractInput>
+    export type ExtractKnowledgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Extract knowledge nodes from transcript using LLM
+ */
+export const useExtractKnowledge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractKnowledge>>, TError,{data: BodyType<ExtractInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof extractKnowledge>>,
+        TError,
+        {data: BodyType<ExtractInput>},
+        TContext
+      > => {
+      return useMutation(getExtractKnowledgeMutationOptions(options));
+    }
+
+export const getDetectConflictsUrl = () => {
+
+
+
+
+  return `/api/detect-conflicts`
+}
 
 /**
  * @summary Generate embedding and detect conflicts via cosine similarity search
  */
-export const DetectConflictsBody = zod.object({
-  "candidateId": zod.number()
-})
+export const detectConflicts = async (conflictDetectInput: ConflictDetectInput, options?: RequestInit): Promise<ConflictResult> => {
 
-export const DetectConflictsResponse = zod.object({
-  "candidateId": zod.number(),
-  "conflictType": zod.enum(['NEW', 'COEXIST', 'UPDATE', 'DUPLICATE']),
-  "similarity": zod.number(),
-  "existingNode": zod.object({
+  return customFetch<ConflictResult>(getDetectConflictsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conflictDetectInput,)
+  }
+);}
 
-}).passthrough().nullish()
-})
 
+
+
+export const getDetectConflictsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof detectConflicts>>, TError,{data: BodyType<ConflictDetectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof detectConflicts>>, TError,{data: BodyType<ConflictDetectInput>}, TContext> => {
+
+const mutationKey = ['detectConflicts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof detectConflicts>>, {data: BodyType<ConflictDetectInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  detectConflicts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DetectConflictsMutationResult = NonNullable<Awaited<ReturnType<typeof detectConflicts>>>
+    export type DetectConflictsMutationBody = BodyType<ConflictDetectInput>
+    export type DetectConflictsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generate embedding and detect conflicts via cosine similarity search
+ */
+export const useDetectConflicts = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof detectConflicts>>, TError,{data: BodyType<ConflictDetectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof detectConflicts>>,
+        TError,
+        {data: BodyType<ConflictDetectInput>},
+        TContext
+      > => {
+      return useMutation(getDetectConflictsMutationOptions(options));
+    }
+
+export const getConfirmNodeUrl = () => {
+
+
+
+
+  return `/api/confirm-node`
+}
 
 /**
  * @summary Confirm and create a knowledge node
  */
-export const ConfirmNodeBody = zod.object({
-  "candidateId": zod.number(),
-  "editedType": zod.union([zod.literal('CONSTRAINT'),zod.literal('DECISION'),zod.literal('ANTI_PATTERN'),zod.literal('FACT'),zod.literal(null)]).nullish(),
-  "editedTitle": zod.string().nullish(),
-  "editedContent": zod.string().nullish(),
-  "editedRationale": zod.string().nullish()
-})
+export const confirmNode = async (confirmNodeInput: ConfirmNodeInput, options?: RequestInit): Promise<KnowledgeNode> => {
 
+  return customFetch<KnowledgeNode>(getConfirmNodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      confirmNodeInput,)
+  }
+);}
+
+
+
+
+export const getConfirmNodeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmNode>>, TError,{data: BodyType<ConfirmNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmNode>>, TError,{data: BodyType<ConfirmNodeInput>}, TContext> => {
+
+const mutationKey = ['confirmNode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmNode>>, {data: BodyType<ConfirmNodeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  confirmNode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmNodeMutationResult = NonNullable<Awaited<ReturnType<typeof confirmNode>>>
+    export type ConfirmNodeMutationBody = BodyType<ConfirmNodeInput>
+    export type ConfirmNodeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm and create a knowledge node
+ */
+export const useConfirmNode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmNode>>, TError,{data: BodyType<ConfirmNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmNode>>,
+        TError,
+        {data: BodyType<ConfirmNodeInput>},
+        TContext
+      > => {
+      return useMutation(getConfirmNodeMutationOptions(options));
+    }
+
+export const getDismissNodeUrl = () => {
+
+
+
+
+  return `/api/dismiss-node`
+}
 
 /**
  * @summary Dismiss a capture candidate
  */
-export const DismissNodeBody = zod.object({
-  "candidateId": zod.number()
-})
+export const dismissNode = async (dismissNodeInput: DismissNodeInput, options?: RequestInit): Promise<ActionResult> => {
 
-export const DismissNodeResponse = zod.object({
-  "success": zod.boolean(),
-  "message": zod.string()
-})
+  return customFetch<ActionResult>(getDismissNodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dismissNodeInput,)
+  }
+);}
 
+
+
+
+export const getDismissNodeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissNode>>, TError,{data: BodyType<DismissNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dismissNode>>, TError,{data: BodyType<DismissNodeInput>}, TContext> => {
+
+const mutationKey = ['dismissNode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dismissNode>>, {data: BodyType<DismissNodeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  dismissNode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DismissNodeMutationResult = NonNullable<Awaited<ReturnType<typeof dismissNode>>>
+    export type DismissNodeMutationBody = BodyType<DismissNodeInput>
+    export type DismissNodeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Dismiss a capture candidate
+ */
+export const useDismissNode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissNode>>, TError,{data: BodyType<DismissNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dismissNode>>,
+        TError,
+        {data: BodyType<DismissNodeInput>},
+        TContext
+      > => {
+      return useMutation(getDismissNodeMutationOptions(options));
+    }
+
+export const getMergeNodeUrl = () => {
+
+
+
+
+  return `/api/merge-node`
+}
 
 /**
  * @summary Merge candidate with existing knowledge node
  */
-export const MergeNodeBody = zod.object({
-  "candidateId": zod.number(),
-  "existingNodeId": zod.number(),
-  "mergedContent": zod.string().nullish()
-})
+export const mergeNode = async (mergeNodeInput: MergeNodeInput, options?: RequestInit): Promise<KnowledgeNode> => {
 
-export const MergeNodeResponse = zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-})
+  return customFetch<KnowledgeNode>(getMergeNodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      mergeNodeInput,)
+  }
+);}
 
+
+
+
+export const getMergeNodeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeNode>>, TError,{data: BodyType<MergeNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mergeNode>>, TError,{data: BodyType<MergeNodeInput>}, TContext> => {
+
+const mutationKey = ['mergeNode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mergeNode>>, {data: BodyType<MergeNodeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  mergeNode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MergeNodeMutationResult = NonNullable<Awaited<ReturnType<typeof mergeNode>>>
+    export type MergeNodeMutationBody = BodyType<MergeNodeInput>
+    export type MergeNodeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Merge candidate with existing knowledge node
+ */
+export const useMergeNode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeNode>>, TError,{data: BodyType<MergeNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mergeNode>>,
+        TError,
+        {data: BodyType<MergeNodeInput>},
+        TContext
+      > => {
+      return useMutation(getMergeNodeMutationOptions(options));
+    }
+
+export const getUndoNodeUrl = () => {
+
+
+
+
+  return `/api/undo-node`
+}
 
 /**
  * @summary Undo an auto-captured node within the 60-second window
  */
-export const UndoNodeBody = zod.object({
-  "nodeId": zod.number()
-})
+export const undoNode = async (undoNodeInput: UndoNodeInput, options?: RequestInit): Promise<ActionResult> => {
 
-export const UndoNodeResponse = zod.object({
-  "success": zod.boolean(),
-  "message": zod.string()
-})
+  return customFetch<ActionResult>(getUndoNodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      undoNodeInput,)
+  }
+);}
+
+
+
+
+export const getUndoNodeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoNode>>, TError,{data: BodyType<UndoNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof undoNode>>, TError,{data: BodyType<UndoNodeInput>}, TContext> => {
+
+const mutationKey = ['undoNode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof undoNode>>, {data: BodyType<UndoNodeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  undoNode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UndoNodeMutationResult = NonNullable<Awaited<ReturnType<typeof undoNode>>>
+    export type UndoNodeMutationBody = BodyType<UndoNodeInput>
+    export type UndoNodeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Undo an auto-captured node within the 60-second window
+ */
+export const useUndoNode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoNode>>, TError,{data: BodyType<UndoNodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof undoNode>>,
+        TError,
+        {data: BodyType<UndoNodeInput>},
+        TContext
+      > => {
+      return useMutation(getUndoNodeMutationOptions(options));
+    }
+
+export const getListKnowledgeNodesUrl = (params?: ListKnowledgeNodesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/knowledge-nodes?${stringifiedParams}` : `/api/knowledge-nodes`
+}
+
+/**
+ * @summary List knowledge nodes with optional filters
+ */
+export const listKnowledgeNodes = async (params?: ListKnowledgeNodesParams, options?: RequestInit): Promise<KnowledgeNode[]> => {
+
+  return customFetch<KnowledgeNode[]>(getListKnowledgeNodesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListKnowledgeNodesQueryKey = (params?: ListKnowledgeNodesParams,) => {
+    return [
+    `/api/knowledge-nodes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListKnowledgeNodesQueryOptions = <TData = Awaited<ReturnType<typeof listKnowledgeNodes>>, TError = ErrorType<unknown>>(params?: ListKnowledgeNodesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listKnowledgeNodes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListKnowledgeNodesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listKnowledgeNodes>>> = ({ signal }) => listKnowledgeNodes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listKnowledgeNodes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListKnowledgeNodesQueryResult = NonNullable<Awaited<ReturnType<typeof listKnowledgeNodes>>>
+export type ListKnowledgeNodesQueryError = ErrorType<unknown>
 
 
 /**
  * @summary List knowledge nodes with optional filters
  */
-export const ListKnowledgeNodesQueryParams = zod.object({
-  "patientId": zod.coerce.number().nullish(),
-  "doctorId": zod.coerce.number().nullish(),
-  "department": zod.coerce.string().nullish(),
-  "type": zod.coerce.string().nullish(),
-  "status": zod.coerce.string().nullish()
-})
 
-export const ListKnowledgeNodesResponseItem = zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-})
-export const ListKnowledgeNodesResponse = zod.array(ListKnowledgeNodesResponseItem)
+export function useListKnowledgeNodes<TData = Awaited<ReturnType<typeof listKnowledgeNodes>>, TError = ErrorType<unknown>>(
+ params?: ListKnowledgeNodesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listKnowledgeNodes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListKnowledgeNodesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSemanticSearchNodesUrl = () => {
+
+
+
+
+  return `/api/knowledge-nodes/search`
+}
 
 /**
  * @summary Semantic similarity search over knowledge nodes
  */
-export const semanticSearchNodesBodyTopKDefault = 10;
+export const semanticSearchNodes = async (semanticSearchBody: SemanticSearchBody, options?: RequestInit): Promise<SemanticSearchResult[]> => {
 
-export const SemanticSearchNodesBody = zod.object({
-  "query": zod.string(),
-  "topK": zod.number().default(semanticSearchNodesBodyTopKDefault)
-})
+  return customFetch<SemanticSearchResult[]>(getSemanticSearchNodesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      semanticSearchBody,)
+  }
+);}
 
-export const SemanticSearchNodesResponseItem = zod.object({
-  "node": zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-}),
-  "similarity": zod.number()
-})
-export const SemanticSearchNodesResponse = zod.array(SemanticSearchNodesResponseItem)
+
+
+
+export const getSemanticSearchNodesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof semanticSearchNodes>>, TError,{data: BodyType<SemanticSearchBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof semanticSearchNodes>>, TError,{data: BodyType<SemanticSearchBody>}, TContext> => {
+
+const mutationKey = ['semanticSearchNodes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof semanticSearchNodes>>, {data: BodyType<SemanticSearchBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  semanticSearchNodes(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SemanticSearchNodesMutationResult = NonNullable<Awaited<ReturnType<typeof semanticSearchNodes>>>
+    export type SemanticSearchNodesMutationBody = BodyType<SemanticSearchBody>
+    export type SemanticSearchNodesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Semantic similarity search over knowledge nodes
+ */
+export const useSemanticSearchNodes = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof semanticSearchNodes>>, TError,{data: BodyType<SemanticSearchBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof semanticSearchNodes>>,
+        TError,
+        {data: BodyType<SemanticSearchBody>},
+        TContext
+      > => {
+      return useMutation(getSemanticSearchNodesMutationOptions(options));
+    }
+
+export const getGetKnowledgeNodeUrl = (nodeId: number,) => {
+
+
+
+
+  return `/api/knowledge-nodes/${nodeId}`
+}
+
+/**
+ * @summary Get a single knowledge node
+ */
+export const getKnowledgeNode = async (nodeId: number, options?: RequestInit): Promise<KnowledgeNode> => {
+
+  return customFetch<KnowledgeNode>(getGetKnowledgeNodeUrl(nodeId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetKnowledgeNodeQueryKey = (nodeId: number,) => {
+    return [
+    `/api/knowledge-nodes/${nodeId}`
+    ] as const;
+    }
+
+
+export const getGetKnowledgeNodeQueryOptions = <TData = Awaited<ReturnType<typeof getKnowledgeNode>>, TError = ErrorType<unknown>>(nodeId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeNode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetKnowledgeNodeQueryKey(nodeId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getKnowledgeNode>>> = ({ signal }) => getKnowledgeNode(nodeId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(nodeId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeNode>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetKnowledgeNodeQueryResult = NonNullable<Awaited<ReturnType<typeof getKnowledgeNode>>>
+export type GetKnowledgeNodeQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Get a single knowledge node
  */
-export const GetKnowledgeNodeParams = zod.object({
-  "nodeId": zod.coerce.number()
-})
 
-export const GetKnowledgeNodeResponse = zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-})
+export function useGetKnowledgeNode<TData = Awaited<ReturnType<typeof getKnowledgeNode>>, TError = ErrorType<unknown>>(
+ nodeId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKnowledgeNode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetKnowledgeNodeQueryOptions(nodeId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateKnowledgeNodeUrl = (nodeId: number,) => {
+
+
+
+
+  return `/api/knowledge-nodes/${nodeId}`
+}
 
 /**
  * @summary Update a knowledge node
  */
-export const UpdateKnowledgeNodeParams = zod.object({
-  "nodeId": zod.coerce.number()
-})
+export const updateKnowledgeNode = async (nodeId: number,
+    knowledgeNodeUpdate: KnowledgeNodeUpdate, options?: RequestInit): Promise<KnowledgeNode> => {
 
-export const UpdateKnowledgeNodeBody = zod.object({
-  "type": zod.union([zod.literal('CONSTRAINT'),zod.literal('DECISION'),zod.literal('ANTI_PATTERN'),zod.literal('FACT'),zod.literal(null)]).nullish(),
-  "title": zod.string().nullish(),
-  "content": zod.string().nullish(),
-  "importance": zod.number().nullish(),
-  "rationale": zod.string().nullish(),
-  "status": zod.union([zod.literal('ACTIVE'),zod.literal('PENDING_CONFIRMATION'),zod.literal('DISMISSED'),zod.literal(null)]).nullish()
-})
+  return customFetch<KnowledgeNode>(getUpdateKnowledgeNodeUrl(nodeId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      knowledgeNodeUpdate,)
+  }
+);}
 
-export const UpdateKnowledgeNodeResponse = zod.object({
-  "id": zod.number(),
-  "type": zod.enum(['CONSTRAINT', 'DECISION', 'ANTI_PATTERN', 'FACT']),
-  "title": zod.string(),
-  "content": zod.string(),
-  "importance": zod.number(),
-  "confidence": zod.number(),
-  "status": zod.enum(['PENDING_CONFIRMATION', 'ACTIVE', 'DISMISSED', 'MERGED']),
-  "level": zod.enum(['patient', 'department', 'organization']),
-  "department": zod.string().nullable(),
-  "rationale": zod.string().nullish(),
-  "patientId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "createdAt": zod.string().optional(),
-  "updatedAt": zod.string().optional()
-})
+
+
+
+export const getUpdateKnowledgeNodeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateKnowledgeNode>>, TError,{nodeId: number;data: BodyType<KnowledgeNodeUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateKnowledgeNode>>, TError,{nodeId: number;data: BodyType<KnowledgeNodeUpdate>}, TContext> => {
+
+const mutationKey = ['updateKnowledgeNode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateKnowledgeNode>>, {nodeId: number;data: BodyType<KnowledgeNodeUpdate>}> = (props) => {
+          const {nodeId,data} = props ?? {};
+
+          return  updateKnowledgeNode(nodeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateKnowledgeNodeMutationResult = NonNullable<Awaited<ReturnType<typeof updateKnowledgeNode>>>
+    export type UpdateKnowledgeNodeMutationBody = BodyType<KnowledgeNodeUpdate>
+    export type UpdateKnowledgeNodeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a knowledge node
+ */
+export const useUpdateKnowledgeNode = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateKnowledgeNode>>, TError,{nodeId: number;data: BodyType<KnowledgeNodeUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateKnowledgeNode>>,
+        TError,
+        {nodeId: number;data: BodyType<KnowledgeNodeUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateKnowledgeNodeMutationOptions(options));
+    }
+
+export const getGetCaptureSummaryUrl = () => {
+
+
+
+
+  return `/api/capture-summary`
+}
+
+/**
+ * @summary Get dashboard summary of capture pipeline stats
+ */
+export const getCaptureSummary = async ( options?: RequestInit): Promise<CaptureSummary> => {
+
+  return customFetch<CaptureSummary>(getGetCaptureSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaptureSummaryQueryKey = () => {
+    return [
+    `/api/capture-summary`
+    ] as const;
+    }
+
+
+export const getGetCaptureSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getCaptureSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaptureSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaptureSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaptureSummary>>> = ({ signal }) => getCaptureSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaptureSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaptureSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getCaptureSummary>>>
+export type GetCaptureSummaryQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Get dashboard summary of capture pipeline stats
  */
-export const GetCaptureSummaryResponse = zod.object({
-  "totalNodes": zod.number(),
-  "activeNodes": zod.number(),
-  "pendingNodes": zod.number(),
-  "todayCaptures": zod.number(),
-  "byType": zod.array(zod.object({
-  "label": zod.string(),
-  "count": zod.number()
-})),
-  "byDepartment": zod.array(zod.object({
-  "label": zod.string(),
-  "count": zod.number()
-})),
-  "byConfidenceTier": zod.array(zod.object({
-  "label": zod.string(),
-  "count": zod.number()
-})),
-  "recentActivity": zod.array(zod.object({
-  "id": zod.number(),
-  "eventType": zod.string(),
-  "candidateId": zod.number().nullish(),
-  "nodeId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "patientId": zod.number().nullish(),
-  "metadata": zod.object({
 
-}).passthrough().nullish(),
-  "createdAt": zod.string()
-}))
-})
+export function useGetCaptureSummary<TData = Awaited<ReturnType<typeof getCaptureSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaptureSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaptureSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListEventsUrl = (params?: ListEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/events?${stringifiedParams}` : `/api/events`
+}
+
+/**
+ * @summary List recent event log entries
+ */
+export const listEvents = async (params?: ListEventsParams, options?: RequestInit): Promise<EventLog[]> => {
+
+  return customFetch<EventLog[]>(getListEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEventsQueryKey = (params?: ListEventsParams,) => {
+    return [
+    `/api/events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListEventsQueryOptions = <TData = Awaited<ReturnType<typeof listEvents>>, TError = ErrorType<unknown>>(params?: ListEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEvents>>> = ({ signal }) => listEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listEvents>>>
+export type ListEventsQueryError = ErrorType<unknown>
 
 
 /**
  * @summary List recent event log entries
  */
-export const ListEventsQueryParams = zod.object({
-  "limit": zod.coerce.number().nullish()
-})
 
-export const ListEventsResponseItem = zod.object({
-  "id": zod.number(),
-  "eventType": zod.string(),
-  "candidateId": zod.number().nullish(),
-  "nodeId": zod.number().nullish(),
-  "doctorId": zod.number().nullish(),
-  "patientId": zod.number().nullish(),
-  "metadata": zod.object({
+export function useListEvents<TData = Awaited<ReturnType<typeof listEvents>>, TError = ErrorType<unknown>>(
+ params?: ListEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-}).passthrough().nullish(),
-  "createdAt": zod.string()
-})
-export const ListEventsResponse = zod.array(ListEventsResponseItem)
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
 
 
