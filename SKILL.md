@@ -1,240 +1,309 @@
 ---
-name: threat_modeling
-description: Perform structured threat modeling for a project and write the result to threat_model.md.
+name: artifacts
+description: "Use when creating or updating the artifact.toml for artifacts such as websites, web apps, mobile apps, slide decks, pitch decks, videos, and data visualizations."
 ---
 
-# Threat Modeling Skill
 
-Analyze a project's architecture and produce a security reference document that describes assets, trust boundaries, applicable threat categories, and the security guarantees the project must uphold.
+# Artifacts Skill
+
+## What Is an Artifact?
+
+An **artifact** is a runnable project the agent creates — the primary unit of output. Each artifact is a workspace package at `artifacts/<slug>/`. `createArtifact()` runs the bootstrap flow, scaffolds files, writes `artifact.toml`, and allocates service ports. Dependency installation runs in the background and may still be going when the call returns.
+
+When the user asks to "build a website" or "create an app", call `createArtifact()` once, then continue implementation. The workspace includes a shared backend service; new web artifacts are primarily frontend packages and must treat `previewPath` as a required URL prefix for all app routes and API calls.
 
 ## When to Use
 
-- New project kickoff or initial architecture review
-- A new feature introduces authentication, data storage, network exposure, or third-party integrations
-- Pre-deploy or pre-launch security review
-- The user explicitly asks for a threat model or security analysis
-- After a significant architectural change (new microservice, new database, new external API)
+Use this skill when:
 
-## When NOT to Use
+- Creating a new web application, video, or slide deck
+- Bootstrapping any new project in the monorepo
 
-- Cosmetic or UI-only changes with no security surface
-- Pure refactors that do not change trust boundaries, data flows, or access control
-- One-off bug fixes unrelated to security
+## New Artifact vs. Existing Artifact
 
-## Methodology
+Add to an existing artifact when the work is a feature, page, or component of that artifact's product and shares the same domain, branding, and purpose. Create a **new** artifact when the work is for a different product or domain, has different branding or purpose, or the user used standalone language like "make a web app" or "create a component." Do not reuse an existing artifact just because it's convenient.
 
-Use a lightweight STRIDE-inspired approach. Work through these steps in order:
+**Not everything needs an artifact.** If the output is a file asset (script, document, image, CSV, config file, etc.), create the file directly and tell the user where it is. Artifacts are for runnable projects with a preview.
 
-### Step 1: Understand the System
+If ambiguous, ask: "Should I create this as a new standalone web app, or add it to [existing artifact name]?"
 
-Read the codebase, `replit.md`, and any existing `threat_model.md`. Identify:
+## When NOT to call `createArtifact`
 
-- What the application does and who its users are
-- The tech stack (language, framework, database, hosting)
-- External services and integrations (payment providers, auth providers, APIs, object storage)
-- A small amount of reusable scan context: likely production entry points, highest-risk code areas, major public/authenticated/admin boundaries, and whether major directories are production, shared, or dev-only
+- The artifact has already been created (do not call `createArtifact` twice for the same `slug`)
 
-### Step 2: Enumerate Assets
+## Build Approach
 
-Assets are anything worth protecting. Common examples:
+Choose your approach based on artifact type:
 
-- **User credentials** -- passwords, tokens, session cookies, API keys
-- **Personal data** -- email addresses, names, payment info, uploaded files
-- **Application secrets** -- database connection strings, signing keys, third-party API keys
-- **Business data** -- orders, invoices, analytics, proprietary content
+- **Creative / canvas artifacts** — no backend, no OpenAPI, no codegen:
+  - **mockup-sandbox** (design mockups, UI prototypes, variant comparisons): Read the `mockup-sandbox` skill. Uses its own Vite dev server and canvas iframes. Delegate design work to a DESIGN subagent. No artifact is needed if the mockup sandbox is present.
+  - **slides** (slide decks, presentations): Create a slides artifact and build following the `slides` skill — no subagent needed. Use `media-generation` for images.
+  - **video-js** (short animated videos, up to ~2 minutes max; most are 30-60s): Create a video artifact and build following the `video-js` skill. Always delegate the entire build to a DESIGN subagent — do not build the video yourself. This is for animated content from code, not a video editor. Size runtime to the content; long videos are unreliable to export.
+- **Full-stack artifacts** (react-vite, data-visualization, expo): Follow the OpenAPI-first workflow below.
+  - If a `react-vite` artifact is frontend-only and doesn't need a backend, skip the OpenAPI spec and codegen — go straight to building the frontend after `createArtifact()`, still using a design subagent.
+  - **Expo apps: skip the OpenAPI workflow by default.** Most mobile apps don't need a backend on the first build. Use AsyncStorage for persistence. Do NOT create a database, OpenAPI spec, or backend routes unless the user explicitly asks for server-side features. After `createArtifact()`, go straight to the Expo skill's `<first_build>` sequence.
 
-### Step 3: Map Trust Boundaries
+**Full-stack artifacts — OpenAPI-first workflow:**
 
-A trust boundary exists wherever data crosses between different levels of trust. Identify:
+Get async work running as early as possible so it can proceed in the background while you build.
 
-- **Client / Server boundary** -- browser or mobile app to backend API
-- **Server / Database boundary** -- application code to data store
-- **Server / External Service boundary** -- your backend calling third-party APIs
-- **Public / Authenticated boundary** -- routes or resources that require auth vs. those that don't
-- **User / Admin boundary** -- privilege separation between roles
-- **Internal / Production boundary** -- dev/staging environments vs. production
+1. **Create the artifact** — call `createArtifact()`. It will guide you to the artifact's skill for build instructions.
+2. **Write the OpenAPI spec** in `lib/api-spec/openapi.yaml` — the single source of truth for all API contracts. It's on the critical path: the spec gates codegen, which gates the frontend. Include both core CRUD and safe wow endpoints — lightweight read-only endpoints that make the app feel polished (dashboard summaries, recent activity, grouped counts, domain aggregates). The artifact's skill has details on what to plan.
+3. **Run codegen** (`pnpm run --filter @workspace/api-spec codegen`) — generates React Query hooks and Zod schemas. Do NOT read the generated files; they are large and will fill your context.
+4. **Launch the frontend build immediately after codegen** — the artifact's skill tells you how (e.g., async design subagent for react-vite and data-visualization). Do NOT do any other work between codegen and launching the frontend build.
+5. **Build the backend while the frontend runs** — provision the database, write the schema, build route handlers, and seed data. The frontend is the bottleneck. **Exception: Expo apps should NOT use this workflow unless the user explicitly requested a backend. Use AsyncStorage instead.**
 
-### Step 4: Walk Through Threat Categories
+**Key principles:**
 
-For each asset and trust boundary, consider these STRIDE categories:
+- Do NOT provision the database or write DB schema before launching the frontend build. DB work doesn't gate the frontend — OpenAPI does.
+- **Expo reminder: do not create a database for Expo apps in the first build.** Use AsyncStorage. This is the most common mistake.
+- No need to test or code review the first build.
+- Trust generated frontend and subagent output as-is. Do not verify it.
+- Batch independent operations within the same artifact into parallel tool calls. Do NOT try to build two artifacts simultaneously — build one at a time.
+- Do not waste time reading files you don't need. All important files have been opened for you.
+- Do not read the artifact's skill before creating the artifact or the skill will be read twice. Creating an artifact automatically loads the relevant skill instructions into your context.
 
-**Spoofing** -- Can an attacker impersonate a legitimate user or service?
+## Creating an Artifact
 
-- Weak or missing authentication on API endpoints
-- Predictable session tokens or JWTs with no signature verification
-- No origin validation on webhooks or callbacks
+`createArtifact()` is a single callback call that handles bootstrap + registration. It expects a fresh slug — if `artifacts/<slug>/` already exists, the call fails instead of reusing partial files.
 
-**Tampering** -- Can an attacker modify data they shouldn't?
-
-- Missing input validation on form fields, query params, or request bodies
-- Client-side-only enforcement of business rules (price, quantity, permissions)
-- Unsigned or unverified data passed between services
-
-**Repudiation** -- Can a user deny performing an action with no way to prove otherwise?
-
-- Missing audit logs for sensitive operations (payments, account changes, data deletion)
-- Logs that don't capture the acting user or timestamp
-- No integrity protection on log storage
-
-**Information Disclosure** -- Can an attacker access data they shouldn't see?
-
-- PII or secrets appearing in logs, error messages, or API responses
-- Overly broad database queries returned directly to the client
-- Directory listings, stack traces, or debug endpoints exposed in production
-- Missing encryption at rest or in transit
-
-**Denial of Service** -- Can an attacker degrade or disrupt the service?
-
-- No rate limiting on authentication or public API endpoints
-- Unbounded file uploads or request body sizes
-- Resource-intensive operations triggered by unauthenticated users
-- Missing timeouts on external service calls
-
-**Elevation of Privilege** -- Can an attacker gain access beyond their authorized level?
-
-- Missing authorization checks after authentication (IDOR, broken function-level access control)
-- Role checks only on the frontend, not enforced server-side
-- SQL injection, command injection, or template injection leading to arbitrary code execution
-- Path traversal allowing file system access outside intended directories
-- Insecure deserialization allowing object manipulation
-
-### Step 5: Describe Required Guarantees
-
-For each relevant threat, describe the security guarantee the project must uphold. Write these as declarative statements:
-
-- "All API endpoints that access user data MUST require a valid session token."
-- "User passwords MUST be hashed with bcrypt (cost >= 12) and MUST NOT appear in logs."
-- "File uploads MUST be validated for type and size, and MUST be stored outside the web root."
-- "All database queries MUST use parameterized statements."
-
-## What to Look Out For
-
-These are the most common and dangerous patterns. Flag them whenever you encounter them:
-
-**Broken access control** -- Missing auth checks on routes, IDOR (guessable IDs granting access to other users' data), privilege escalation through parameter manipulation, admin functionality reachable by regular users.
-
-**Injection** -- SQL queries built with string concatenation, shell commands constructed from user input, template injection through unsanitized variables, path traversal via user-supplied file names, unsafe deserialization of user-controlled data.
-
-**Cryptographic failures** -- Hardcoded secrets or API keys in source code, secrets committed to git, weak hashing algorithms (MD5, SHA1 for passwords), plaintext storage or logging of PII, missing HTTPS enforcement.
-
-**Security misconfiguration** -- Debug mode enabled in production, CORS set to `*` or overly permissive, default credentials left in place, verbose error messages exposing internals, permissive Content Security Policy.
-
-**SSRF and open redirects** -- User-controlled URLs fetched server-side without allowlist validation, redirect targets taken from query parameters without validation.
-
-**Dependency vulnerabilities** -- Outdated packages with known CVEs, no lockfile or pinned versions, dependencies pulled from untrusted registries.
-
-**Data exposure** -- PII in application logs, overly broad API responses returning fields the client doesn't need, missing rate limiting allowing data scraping, no encryption at rest for sensitive data.
-
-## Output: `threat_model.md`
-
-You MUST write the completed threat model to `threat_model.md` in the project root. If the file already exists, update it in place rather than overwriting unrelated sections.
-
-`threat_model.md` is a **project-level security reference document**, not a tracker. It describes the system, its security-relevant architecture, and the guarantees it must uphold. Another agent will read this file to inform its security decisions -- write it for that audience.
-
-Use the following structure:
-
-```markdown
-# Threat Model
-
-## Project Overview
-
-Brief description of what the application does, its tech stack, and its users.
-
-## Assets
-
-What is worth protecting in this project. Describe each asset category and why it matters.
-
-## Trust Boundaries
-
-Where data crosses between different trust levels. Describe each boundary and what it separates.
-
-## Scan Anchors
-
-A short list of reusable pointers for future security analysis:
-- Production entry points, preferably with concrete file or directory paths when known
-- Highest-risk code areas, preferably with concrete packages, route files, or service directories when known
-- Public vs authenticated vs admin surfaces
-- Dev-only areas that should usually be ignored unless proven reachable in production
-
-Keep this section brief. It should store just enough concrete context to speed up future security scans without turning the threat model into a full repo inventory.
-
-If project context already exists in `replit.md` (project README) or `.agents/memory/` (agent memory), don't repeat the same information.
-
-## Threat Categories
-
-For each STRIDE category that is relevant to this project, write a short narrative:
-- What the threat is in the context of this specific project
-- Why it matters here (what could go wrong)
-- What guarantees are required to address it
-
-Omit categories that genuinely do not apply. Do not pad with generic boilerplate.
+```javascript
+const result = await createArtifact({
+    artifactType: "<artifactType>",
+    slug: "<slug>",
+    previewPath: "/",
+    title: "My Project"
+});
 ```
 
-### Example: E-commerce App
+## Available Callbacks
 
-```markdown
-# Threat Model
+### createArtifact(artifactType, slug, previewPath, title)
 
-## Project Overview
+Bootstrap and register a new artifact in one call. Default for all new artifacts; requires an unused `slug`.
 
-A Node.js/Express e-commerce application with a React frontend, PostgreSQL database,
-and Stripe integration for payments. Users can browse products, create accounts,
-and purchase items. Deployed on Replit with Replit Auth for user authentication.
+**Parameters:**
 
-## Assets
+<!-- BEGIN_ARTIFACT_LIST -->
+- `artifactType` (str, required): The artifact type identifier. Use one of:
+  - `"expo"` (mobile app)
+  - `"data-visualization"` (data visualization scaffold (dashboards, analysis reports, dataset explorers) with chart/table defaults)
+  - `"mockup-sandbox"` (isolated mockup sandbox for rapid UI prototyping on the canvas)
+  - `"react-vite"` (React + Vite web app)
+  - `"slides"` (presentation slide deck scaffold)
+  - `"video-js"` (Replit Animation app)
+<!-- END_ARTIFACT_LIST -->
+- `slug` (str, required): A short, kebab-case slug (e.g., `"my-website"`, `"q1-pitch-deck"`, `"budget-tracker"`). Used in two places:
+  - Workspace package name: `@workspace/<slug>`
+  - Artifact directory: `artifacts/<slug>/`
+- `previewPath` (str, required): The URL prefix where the artifact is served. **Use `"/<slug>/"` (e.g., `"/my-website/"`, `"/budget-tracker/"`) for consistency.** However, **one artifact should always be at `"/"`** — if nothing is at the root, the dev URL (e.g. `my-app.replit.app`) shows a blank page. Prefer placing web apps (`react-vite`, `data-visualization`) at the root over mobile, video, or slides artifacts. Every artifact in the workspace must use unique service paths.
+- `title` (str, required): A short, human-readable title (e.g., `"Recipe Finder"`, `"Q1 Pitch Deck"`). Displayed to the user.
 
-- **User accounts and sessions** -- email addresses, hashed passwords, session tokens.
-  Compromise allows impersonation and access to order history and saved payment methods.
-- **Payment data** -- Stripe customer IDs and tokenized payment references. The app never
-  stores raw card numbers, but Stripe tokens could be used to initiate charges.
-- **Order data** -- order history, shipping addresses, item quantities and prices.
-  Contains PII and business-sensitive pricing information.
-- **Application secrets** -- Stripe API keys, database connection string, session signing key.
-  Compromise of Stripe secret key allows arbitrary charges.
+**Returns:** Dict with:
 
-## Trust Boundaries
+- `success` (bool): Whether the operation succeeded
+- `artifactId` (str): The stable artifact ID — pass this to `presentArtifact`
+- `ports` (dict[str, int]): Map of service names to their assigned local ports
 
-- **Browser to API** -- all client requests cross this boundary. The API must authenticate
-  and authorize every request; the client is untrusted.
-- **API to PostgreSQL** -- the API server has direct database access. SQL injection at the
-  API layer would give an attacker full database access.
-- **API to Stripe** -- the server calls Stripe's API with a secret key. SSRF or key leakage
-  would allow unauthorized payment operations.
-- **Authenticated to Unauthenticated** -- product browsing is public; cart, checkout, and
-  account pages require authentication. The boundary must be enforced server-side.
+**Example:**
 
-## Threat Categories
-
-### Spoofing
-
-Users authenticate via Replit Auth. The application must validate the authentication
-token on every request to protected endpoints. Session tokens must be unpredictable
-and expire within a reasonable window. Webhooks from Stripe must be verified using
-Stripe's webhook signature mechanism.
-
-### Tampering
-
-Product prices and order totals must be calculated server-side. The client sends a cart
-(product IDs and quantities) but the server must look up current prices from the database.
-Accepting client-supplied prices would allow purchasing items for arbitrary amount(s).
-
-### Information Disclosure
-
-API responses for order history must be scoped to the authenticated user. The /api/orders
-endpoint must filter by user ID server-side. Error responses must not include stack traces
-or database error details. Stripe API keys must never appear in client-side code or logs.
-
-### Elevation of Privilege
-
-Admin routes (product management, order fulfillment) must check for an admin role
-server-side. All database queries must use parameterized statements to prevent SQL
-injection. File upload endpoints (product images) must validate file type and size.
+```javascript
+const result = await createArtifact({
+    artifactType: "react-vite",
+    slug: "my-website",
+    previewPath: "/",
+    title: "Recipe Finder"
+});
 ```
 
-### Key Principles
+### listArtifacts()
 
-- Be specific to the project. Generic boilerplate like "use HTTPS" is not useful unless the project is actually missing it.
-- Write declaratively. Describe what the system is, what its threats are, and what guarantees it requires.
-- Omit irrelevant categories. If the project has no file uploads, do not write about file upload threats.
-- Keep it concise. This is a reference document, not an essay. A smart agent will reason from it.
-- Keep `## Scan Anchors` brief. It should speed up future security scans without turning the threat model into a repo inventory.
+List all artifacts currently registered in the workspace. Use this to look up artifact IDs when you need to present or reference an artifact you didn't just create.
+
+**Parameters:** None
+
+**Returns:** Dict with:
+
+- `artifacts` (list): Each entry contains:
+  - `artifactId` (str): The stable artifact ID — pass this to `presentArtifact`
+  - `kind` (str): How the artifact is presented (preview kind, e.g., `"web"`, `"slides"`, `"video"`)
+  - `title` (str | null): The human-readable title
+  - `artifactDir` (str): The folder name where the artifact lives
+
+**Example:**
+
+```javascript
+const {artifacts} = await listArtifacts();
+```
+
+### verifyAndReplaceArtifactToml(tempFilePath, artifactTomlPath)
+
+Replace an existing `artifact.toml` through a validated temp file. Do not edit `artifact.toml` directly.
+
+**Parameters:**
+
+- `tempFilePath` (str, required): Absolute path to the temporary TOML file you wrote and edited.
+- `artifactTomlPath` (str, required): Absolute path to the real `artifact.toml` file to replace. Must point to a real `.replit-artifact/artifact.toml` inside the repl.
+
+**Flow:**
+
+1. Use `listArtifacts()` to identify the artifact directory when needed.
+2. Read the current `artifact.toml`, then write a sibling temp file such as `/absolute/path/to/artifacts/my-app/.replit-artifact/artifact.edit.toml`.
+3. Make all edits against the temp file using normal file editing tools — the temp file must contain the full final TOML (no partial-merge).
+4. Call `verifyAndReplaceArtifactToml()` with absolute paths. If validation fails, the temp file is left in place so you can inspect and fix it.
+
+**When to use:** changing artifact metadata (`title`, `previewPath`, `kind`, `version`); changing service definitions, paths, commands, ports, rewrites, or env blocks; or making multiple coordinated TOML edits at once.
+
+**Do not:** edit `artifact.toml` in place, or call this with paths outside `.replit-artifact/artifact.toml`.
+
+**Returns:** Dict with:
+
+- `success` (bool): Whether the replacement succeeded
+
+**Example:**
+
+```javascript
+await verifyAndReplaceArtifactToml({
+    tempFilePath: "/absolute/path/to/artifacts/my-website/.replit-artifact/artifact.edit.toml",
+    artifactTomlPath: "/absolute/path/to/artifacts/my-website/.replit-artifact/artifact.toml"
+});
+```
+
+## Delivering the Result — `presentArtifact` + `suggestDeploy`
+
+After building, present the artifact and — for deployable types — suggest publish, all in one code execution block.
+
+**Deployable artifacts** (`react-vite`, `expo`, `data-visualization`) — present and suggest deploy:
+
+```javascript
+await presentArtifact({artifactId: result.artifactId});
+await suggestDeploy();
+```
+
+**Non-deployable artifacts** (`slides`, `video-js`, `mockup-sandbox`) — present only. `mockup-sandbox` is a local prototyping sandbox. `video-js` is exported from the preview pane. `slides` has a dedicated `exportSlides` callback (see the `slides` skill). **Never call `suggestDeploy` for these types:**
+
+```javascript
+await presentArtifact({artifactId: result.artifactId});
+```
+
+- `presentArtifact` opens the preview pane so the user can see what you built. Without this call, the user won't see the preview — even if the app is running correctly. Pass the `artifactId` (str, required) from `createArtifact`. For canvas/design artifacts, also pass `shapeIds` (list[str], optional) — the IDs of shapes to focus on when the preview opens.
+- `suggestDeploy` prompts the user to publish with one click. Takes no parameters. Terminal action — once called, do not take further actions.
+
+Always call `presentArtifact` after finishing work on any artifact — whether you just created it, made changes, or fixed a bug. If you built multiple artifacts, present each one. Some skills define additional post-present steps (e.g., data analysis); follow those after presenting.
+
+## Services and Workflows
+
+<!-- BEGIN_SERVICES_TABLE -->
+| Artifact | Preview Kind | Service name(s) | Dev command(s) | Path | Production serve | Production build | Production run |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `expo` | `mobile` | `expo` | `pnpm --filter @workspace/__SLUG__ run dev` | `previewPath` |  | `pnpm --filter @workspace/__SLUG__ run build` | `pnpm --filter @workspace/__SLUG__ run serve` |
+| `data-visualization` | `web` | `web` | `pnpm --filter @workspace/__SLUG__ run dev` | `previewPath` | `static` | `pnpm --filter @workspace/__SLUG__ run build` |  |
+| `mockup-sandbox` | `design` | `web` | `pnpm --filter @workspace/__SLUG__ run dev` | `previewPath` | — | — | — |
+| `react-vite` | `web` | `web` | `pnpm --filter @workspace/__SLUG__ run dev` | `previewPath` | `static` | `pnpm --filter @workspace/__SLUG__ run build` |  |
+| `slides` | `slides` | `web` | `pnpm --filter @workspace/__SLUG__ run dev` | `previewPath` | `static` | `pnpm --filter @workspace/__SLUG__ run build` |  |
+| `video-js` | `video` | `web` | `pnpm --filter @workspace/__SLUG__ run dev` | `previewPath` | `static` | `pnpm --filter @workspace/__SLUG__ run build` |  |
+<!-- END_SERVICES_TABLE -->
+
+The web service's URL prefix is set to whatever you pass as `previewPath`. Route handling is prefix-aware: frontend routes and API requests must include this prefix.
+
+**Mobile:** Expo is served at its assigned port and uses `previewPath` as its registered route.
+
+## Failure Recovery
+
+If `createArtifact` fails, inspect the error and retry with corrected inputs. The callback requires a clean `slug` on each attempt, so remove any partial `artifacts/<slug>/` directory before reusing that slug.
+
+- **Slug already exists** → Choose a different `slug`, or remove the existing artifact directory before retrying
+- **`DUPLICATE_PREVIEW_PATH`** → Choose a different `previewPath`
+- **Bootstrap fails** → Fix the reported shell/setup issue, then retry with a clean slug
+- **Artifact is missing `files/`** → Migrate that artifact type to the shared bootstrap layout before using `createArtifact`
+
+## Examples
+
+<!-- BEGIN_EXAMPLES -->
+### Mobile app (`expo`)
+
+```javascript
+const result = await createArtifact({
+    artifactType: "expo",
+    slug: "my-app",
+    previewPath: "/",
+    title: "My App"
+});
+const expoPort = result.ports.expo;
+
+// Expo is scaffolded under artifacts/my-app
+// and API work should be added to the shared api-server.
+//
+// Multi-artifact note: do not tell the subagent to read a sibling web
+// artifact's src/index.css for design tokens here — that CSS is only
+// trustworthy after the web frontend build has finished. Instead,
+// extract tokens in the main loop after the web build completes, sync
+// them into constants/colors.ts (colors + radius), app.json, and _layout.tsx yourself,
+// then launch the Expo subagent with the synced files. See
+// multi-artifact-creation.md "Visual Consistency" for the full sequence.
+await startAsyncSubagent({
+    task: "Build the mobile app frontend. Read the expo SKILL.md, then implement the UI components and screens. Use the design tokens from constants/colors.ts via the useColors hook (colors and radius), configure fonts in app/_layout.tsx, and set the splash background in app.json.",
+    relevantFiles: [
+        ".local/skills/expo/SKILL.md",
+        "artifacts/my-app/app/_layout.tsx",
+        "artifacts/my-app/app/(tabs)/_layout.tsx",
+        "artifacts/my-app/app/(tabs)/index.tsx",
+        "artifacts/api-server/src/index.ts",
+        "artifacts/my-app/constants/colors.ts",
+        "artifacts/my-app/hooks/useColors.ts",
+        "artifacts/my-app/app.json"
+    ]
+});
+
+await presentArtifact({artifactId: result.artifactId});
+await suggestDeploy();
+```
+
+### Dashboard scaffold with chart/table defaults (`data-visualization`)
+
+```javascript
+const result = await createArtifact({
+    artifactType: "data-visualization",
+    slug: "sales-dashboard",
+    previewPath: "/sales-dashboard/",
+    title: "Sales Dashboard"
+});
+
+// Recharts, PapaParse, and TanStack React Table are pre-configured
+await startAsyncSubagent({
+    task: "Build the dashboard",
+    relevantFiles: [
+        ".local/skills/data-visualization/SKILL.md",
+        "artifacts/dashboard/client/src/pages/Dashboard.tsx",
+        "artifacts/dashboard/server/routes.ts",
+        "artifacts/dashboard/client/src/config.ts"
+    ]
+});
+
+await presentArtifact({artifactId: result.artifactId});
+await suggestDeploy();
+```
+
+Creates a data visualization dashboard with Recharts (charts), PapaParse (CSV parsing), and TanStack React Table (data tables) pre-configured.
+<!-- END_EXAMPLES -->
+
+### Multiple artifacts in one workspace
+
+Each artifact must have a unique `slug` and `previewPath`. At least one artifact MUST use `previewPath: "/"` — otherwise users will see a blank page at the root.
+
+**IMPORTANT:** When building multiple artifacts, you MUST read `.local/skills/artifacts/references/multi-artifact-creation.md` BEFORE creating any artifacts. Do not skip this — it contains critical sequencing and parallelism rules that will significantly affect build quality and speed.
+
+## Limitations
+
+- Each `slug` can only be used once — calling `createArtifact` again with the same `slug` will fail
+- Artifacts must use one of the artifact types listed above
+- Port assignment is automatic and cannot be manually specified
+
+## Bootstrap Constraints
+
+<!-- BEGIN_BOOTSTRAP_CONSTRAINTS -->
+### Mobile bootstrap rules (`artifact: "expo"`)
+
+- Expo now uses the shared Express API server in the monorepo. Add backend routes in `artifacts/api-server`.
+- The generated package owns its Expo dependencies; keep them in `files/package.json.template` so `pnpm install` produces a runnable app.
+<!-- END_BOOTSTRAP_CONSTRAINTS -->
