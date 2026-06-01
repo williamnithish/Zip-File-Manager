@@ -1,6 +1,6 @@
-# Object Storage — OpenAPI Spec Additions
+# OpenAI Integration — OpenAPI Endpoints
 
-Add these entries to `lib/api-spec/openapi.yaml`. Paths are relative to the base server URL — **do not** include the `/api` prefix (the Orval config sets `baseUrl: "/api"`).
+Add these entries to `lib/api-spec/openapi.yaml`. All paths below are relative to the base server URL (`/api`).
 
 After editing the spec, run codegen:
 
@@ -13,8 +13,8 @@ pnpm --filter @workspace/api-spec run codegen
 Add under `tags`:
 
 ```yaml
-  - name: Storage
-    description: Object storage upload and serving endpoints.
+  - name: openai
+    description: OpenAI AI chat, image, and audio operations
 ```
 
 ## Paths
@@ -22,109 +22,164 @@ Add under `tags`:
 Add under `paths`:
 
 ```yaml
-  /storage/uploads/request-url:
+  /openai/conversations:
+    get:
+      operationId: listOpenaiConversations
+      tags: [openai]
+      summary: List all conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenaiConversation"
     post:
-      tags: [Storage]
-      operationId: requestUploadUrl
-      summary: Request a presigned URL for file upload
-      description: |
-        Returns a presigned GCS URL for direct upload. The client sends JSON
-        metadata here, then uploads the file directly to the returned URL.
+      operationId: createOpenaiConversation
+      tags: [openai]
+      summary: Create a new conversation
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadUrlRequest'
+              $ref: "#/components/schemas/OpenaiConversationInput"
       responses:
-        '200':
-          description: Presigned upload URL generated.
+        "201":
+          description: Created conversation
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadUrlResponse'
-        '400':
-          description: Missing or invalid required fields.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Failed to generate upload URL.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /storage/public-objects/{filePath}:
+                $ref: "#/components/schemas/OpenaiConversation"
+  /openai/conversations/{id}:
     get:
-      tags: [Storage]
-      operationId: getPublicObject
-      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
-      description: |
-        Unconditionally public — no authentication or ACL checks.
-        Searches PUBLIC_OBJECT_SEARCH_PATHS for the given file path.
+      operationId: getOpenaiConversation
+      tags: [openai]
+      summary: Get conversation with messages
       parameters:
-        - name: filePath
+        - name: id
           in: path
           required: true
           schema:
-            type: string
-          description: Relative file path within the public search paths.
+            type: integer
       responses:
-        '200':
-          description: Object content streamed with correct Content-Type.
-          content:
-            '*/*':
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: File not found.
+        "200":
+          description: Conversation with messages
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Failed to serve public object.
+                $ref: "#/components/schemas/OpenaiConversationWithMessages"
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /storage/objects/{objectPath}:
-    get:
-      tags: [Storage]
-      operationId: getStorageObject
-      summary: Serve an object entity from PRIVATE_OBJECT_DIR
-      description: |
-        Serves object entities uploaded via presigned URLs. These can optionally
-        be protected with authentication or ACL checks based on the use case.
+                $ref: "#/components/schemas/OpenaiError"
+    delete:
+      operationId: deleteOpenaiConversation
+      tags: [openai]
+      summary: Delete a conversation
       parameters:
-        - name: objectPath
+        - name: id
           in: path
           required: true
           schema:
-            type: string
-          description: Object path within the private object dir (e.g. `uploads/some-uuid`).
+            type: integer
       responses:
-        '200':
-          description: Object content streamed with correct Content-Type.
-          content:
-            '*/*':
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: Object not found.
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Failed to serve object.
+                $ref: "#/components/schemas/OpenaiError"
+  /openai/conversations/{id}/messages:
+    get:
+      operationId: listOpenaiMessages
+      tags: [openai]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of messages
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+                type: array
+                items:
+                  $ref: "#/components/schemas/OpenaiMessage"
+    post:
+      operationId: sendOpenaiMessage
+      tags: [openai]
+      summary: Send a text message and receive a streaming text response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenaiMessageInput"
+      responses:
+        "200":
+          description: SSE stream of assistant text chunks
+          content:
+            text/event-stream: {}
+  /openai/conversations/{id}/voice-messages:
+    post:
+      operationId: sendOpenaiVoiceMessage
+      tags: [openai]
+      summary: Send audio and receive a streaming voice response
+      description: |
+        This endpoint is for gpt-audio speech-to-speech flows.
+        It accepts base64-encoded audio input and streams back transcript and audio events.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenaiVoiceMessageInput"
+      responses:
+        "200":
+          description: SSE stream of transcript and audio chunks
+          content:
+            text/event-stream: {}
+  /openai/generate-image:
+    post:
+      operationId: generateOpenaiImage
+      tags: [openai]
+      summary: Generate an image from a text prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenaiImageInput"
+      responses:
+        "200":
+          description: Generated image data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenaiImageOutput"
 ```
 
 ## Schemas
@@ -132,45 +187,110 @@ Add under `paths`:
 Add under `components.schemas`:
 
 ```yaml
-    UploadUrlRequest:
+    OpenaiConversation:
       type: object
-      required: [name, size, contentType]
       properties:
-        name:
-          type: string
-          minLength: 1
-          description: Original file name.
-        size:
+        id:
           type: integer
-          minimum: 1
-          description: File size in bytes.
-        contentType:
+        title:
           type: string
-          minLength: 1
-          description: MIME type of the file (e.g. `image/jpeg`).
-    UploadUrlResponse:
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - createdAt
+    OpenaiMessage:
       type: object
-      required: [uploadURL, objectPath]
       properties:
-        uploadURL:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
           type: string
-          format: uri
-          description: Presigned GCS URL for PUT upload.
-        objectPath:
+        content:
           type: string
-          description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
-        metadata:
-          $ref: '#/components/schemas/UploadUrlRequest'
-    ErrorEnvelope:
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+    OpenaiConversationInput:
       type: object
-      required: [error]
+      properties:
+        title:
+          type: string
+      required:
+        - title
+    OpenaiMessageInput:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+    OpenaiVoiceMessageInput:
+      type: object
+      properties:
+        audio:
+          type: string
+          description: Base64-encoded audio data
+      required:
+        - audio
+    OpenaiConversationWithMessages:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpenaiMessage"
+      required:
+        - id
+        - title
+        - createdAt
+        - messages
+    OpenaiImageInput:
+      type: object
+      properties:
+        prompt:
+          type: string
+        size:
+          type: string
+          enum: ["1024x1024", "512x512", "256x256"]
+      required:
+        - prompt
+    OpenaiImageOutput:
+      type: object
+      properties:
+        b64_json:
+          type: string
+      required:
+        - b64_json
+    OpenaiError:
+      type: object
       properties:
         error:
           type: string
+      required:
+        - error
 ```
 
 ## Notes
 
-- The `POST /storage/uploads/request-url` request body contains JSON metadata only — **never** the file itself. The file is uploaded directly to the presigned URL returned in the response.
-- The `GET /storage/objects/{objectPath}` endpoint streams binary content. The generated client may not be useful for this endpoint; use `fetch` or `<img src=...>` directly.
-- If an `ErrorEnvelope` schema already exists from another skill (e.g. replit-auth), reuse it instead of adding a duplicate.
+- The `sendOpenaiMessage` and `sendOpenaiVoiceMessage` endpoints both return SSE streams (`text/event-stream`). Orval cannot generate a typed hook for SSE. Consume them manually with `fetch` + `ReadableStream` on the client (`EventSource` only supports GET and cannot send a request body).
+- `sendOpenaiMessage` is the text endpoint. Its SSE stream sends `data: {"content": "..."}` chunks followed by `data: {"done": true}`.
+- `sendOpenaiVoiceMessage` is the voice endpoint. Its SSE stream sends `data: {"type": "transcript", "data": "..."}` and `data: {"type": "audio", "data": "<base64>"}` chunks, then a final `data: {"done": true}`.
+- For image generation, `response_format` is always base64 with gpt-image-1 (not configurable via API).
